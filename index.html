@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>日本語 ローマ字入力 タイピング 練習</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+.char-correct{color:#22c55e;border-bottom:2px solid #22c55e;}
+.char-wrong{color:#ef4444;background:#fef2f2;border-radius:2px;}
+.char-current{background:#fef9c3;border-bottom:2px solid #f59e0b;}
+.char-pending{color:#6b7280;}
+</style>
+</head>
+<body class="bg-gray-50 min-h-screen">
+<div class="max-w-3xl mx-auto px-4 py-8">
+  <h1 class="text-3xl font-bold text-gray-800 mb-2">日本語 ローマ字入力 タイピング 練習</h1>
+  <p class="text-gray-500 mb-6">ひらがな・カタカナのローマ字入力練習。WPM計測・ミス文字統計。</p>
+
+  <!-- 設定 -->
+  <div class="bg-white rounded-xl shadow p-5 mb-5">
+    <div class="flex flex-wrap gap-4 items-center">
+      <div>
+        <span class="text-sm font-medium text-gray-700 mr-2">レベル:</span>
+        <div class="inline-flex rounded-lg overflow-hidden border" role="group" aria-label="レベル選択">
+          <button class="level-btn active px-3 py-1.5 text-sm bg-indigo-600 text-white" data-level="gojuon">五十音</button>
+          <button class="level-btn px-3 py-1.5 text-sm bg-gray-100 text-gray-600 hover:bg-gray-200" data-level="words">単語</button>
+          <button class="level-btn px-3 py-1.5 text-sm bg-gray-100 text-gray-600 hover:bg-gray-200" data-level="sentences">文章</button>
+        </div>
+      </div>
+      <div>
+        <span class="text-sm font-medium text-gray-700 mr-2">問題数:</span>
+        <select id="question-count" class="border rounded px-2 py-1 text-sm" aria-label="出題数">
+          <option value="5">5問</option>
+          <option value="10" selected>10問</option>
+          <option value="20">20問</option>
+        </select>
+      </div>
+      <button id="start-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg text-sm font-semibold">開始</button>
+    </div>
+  </div>
+
+  <!-- 練習エリア -->
+  <div id="practice-area" class="hidden">
+    <!-- 進捗 -->
+    <div class="flex justify-between items-center mb-3 text-sm text-gray-500">
+      <span>問題 <span id="q-current">1</span> / <span id="q-total">10</span></span>
+      <div class="flex gap-4">
+        <span>WPM: <span id="wpm" class="font-bold text-indigo-600">—</span></span>
+        <span>正確率: <span id="accuracy" class="font-bold text-green-600">100%</span></span>
+        <span id="timer-display">⏱ <span id="elapsed-time">0.0</span>s</span>
+      </div>
+    </div>
+
+    <!-- 出題 -->
+    <div class="bg-white rounded-xl shadow p-6 mb-4">
+      <!-- 日本語表示 -->
+      <div class="text-center mb-4">
+        <div id="japanese-display" class="text-4xl font-bold text-gray-800 tracking-widest mb-2"></div>
+        <div id="romaji-hint" class="text-sm text-gray-400"></div>
+      </div>
+
+      <!-- 入力進捗表示 -->
+      <div id="progress-display" class="text-2xl font-mono text-center tracking-wider mb-4 min-h-8"></div>
+
+      <!-- 入力欄 -->
+      <div class="relative">
+        <input type="text" id="type-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"
+          class="w-full border-2 rounded-lg px-4 py-3 text-xl font-mono focus:outline-none focus:border-indigo-400 text-center"
+          placeholder="ローマ字を入力..." aria-label="ローマ字入力欄">
+      </div>
+      <div id="feedback" class="text-center mt-2 text-sm min-h-5"></div>
+    </div>
+
+    <!-- スキップ -->
+    <div class="flex justify-center gap-3 mb-4">
+      <button id="skip-btn" class="text-sm text-gray-400 hover:text-gray-600 px-3 py-1 rounded border border-gray-300">スキップ</button>
+      <button id="show-hint" class="text-sm text-blue-400 hover:text-blue-600 px-3 py-1 rounded border border-blue-200">ヒント表示</button>
+    </div>
+  </div>
+
+  <!-- 結果 -->
+  <div id="result-area" class="hidden bg-white rounded-xl shadow p-6 mb-6">
+    <h2 class="text-2xl font-bold text-center text-gray-800 mb-4">結果</h2>
+    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div class="bg-indigo-50 rounded-xl p-4 text-center">
+        <div id="res-wpm" class="text-3xl font-bold text-indigo-700">0</div>
+        <div class="text-xs text-gray-500">WPM</div>
+      </div>
+      <div class="bg-green-50 rounded-xl p-4 text-center">
+        <div id="res-accuracy" class="text-3xl font-bold text-green-700">0%</div>
+        <div class="text-xs text-gray-500">正確率</div>
+      </div>
+      <div class="bg-yellow-50 rounded-xl p-4 text-center">
+        <div id="res-time" class="text-3xl font-bold text-yellow-700">0s</div>
+        <div class="text-xs text-gray-500">経過時間</div>
+      </div>
+      <div class="bg-red-50 rounded-xl p-4 text-center">
+        <div id="res-misses" class="text-3xl font-bold text-red-700">0</div>
+        <div class="text-xs text-gray-500">ミス回数</div>
+      </div>
+    </div>
+    <div id="miss-analysis" class="mb-4"></div>
+    <div class="flex justify-center">
+      <button id="retry-btn" class="bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg">もう一度</button>
+    </div>
+  </div>
+
+  <!-- 統計 -->
+  <div class="bg-white rounded-xl shadow p-5">
+    <div class="flex justify-between items-center mb-3">
+      <h2 class="font-semibold text-gray-700">統計（累計）</h2>
+      <button id="clear-stats" class="text-xs text-red-400 hover:text-red-600" aria-label="統計をクリア">クリア</button>
+    </div>
+    <div id="stats-display" class="text-sm text-gray-500">まだ記録がありません</div>
+  </div>
+</div>
+
+<script>
+const STORAGE_KEY='typing-v1';
+
+// ローマ字変換テーブル
+const ROMAJI_TABLE={
+  'あ':'a','い':'i','う':'u','え':'e','お':'o',
+  'か':'ka','き':'ki','く':'ku','け':'ke','こ':'ko',
+  'さ':'sa','し':'si','す':'su','せ':'se','そ':'so',
+  'た':'ta','ち':'ti','つ':'tu','て':'te','と':'to',
+  'な':'na','に':'ni','ぬ':'nu','ね':'ne','の':'no',
+  'は':'ha','ひ':'hi','ふ':'fu','へ':'he','ほ':'ho',
+  'ま':'ma','み':'mi','む':'mu','め':'me','も':'mo',
+  'や':'ya','ゆ':'yu','よ':'yo',
+  'ら':'ra','り':'ri','る':'ru','れ':'re','ろ':'ro',
+  'わ':'wa','を':'wo','ん':'nn',
+  'が':'ga','ぎ':'gi','ぐ':'gu','げ':'ge','ご':'go',
+  'ざ':'za','じ':'zi','ず':'zu','ぜ':'ze','ぞ':'zo',
+  'だ':'da','ぢ':'di','づ':'du','で':'de','ど':'do',
+  'ば':'ba','び':'bi','ぶ':'bu','べ':'be','ぼ':'bo',
+  'ぱ':'pa','ぴ':'pi','ぷ':'pu','ぺ':'pe','ぽ':'po',
+  'きゃ':'kya','きゅ':'kyu','きょ':'kyo',
+  'しゃ':'sya','しゅ':'syu','しょ':'syo',
+  'ちゃ':'tya','ちゅ':'tyu','ちょ':'tyo',
+  'にゃ':'nya','にゅ':'nyu','にょ':'nyo',
+  'ひゃ':'hya','ひゅ':'hyu','ひょ':'hyo',
+  'みゃ':'mya','みゅ':'myu','みょ':'myo',
+  'りゃ':'rya','りゅ':'ryu','りょ':'ryo',
+  'ぎゃ':'gya','ぎゅ':'gyu','ぎょ':'gyo',
+  'じゃ':'ja','じゅ':'ju','じょ':'jo',
+  'びゃ':'bya','びゅ':'byu','びょ':'byo',
+  'ぴゃ':'pya','ぴゅ':'pyu','ぴょ':'pyo',
+  'ア':'a','イ':'i','ウ':'u','エ':'e','オ':'o',
+  'カ':'ka','キ':'ki','ク':'ku','ケ':'ke','コ':'ko',
+  'サ':'sa','シ':'si','ス':'su','セ':'se','ソ':'so',
+  'タ':'ta','チ':'ti','ツ':'tu','テ':'te','ト':'to',
+  'ナ':'na','ニ':'ni','ヌ':'nu','ネ':'ne','ノ':'no',
+  'ハ':'ha','ヒ':'hi','フ':'fu','ヘ':'he','ホ':'ho',
+  'マ':'ma','ミ':'mi','ム':'mu','メ':'me','モ':'mo',
+  'ヤ':'ya','ユ':'yu','ヨ':'yo',
+  'ラ':'ra','リ':'ri','ル':'ru','レ':'re','ロ':'ro',
+  'ワ':'wa','ヲ':'wo','ン':'nn',
+};
+
+const QUESTIONS={
+  gojuon:[
+    {jp:'あいうえお',hint:''},
+    {jp:'かきくけこ',hint:''},
+    {jp:'さしすせそ',hint:''},
+    {jp:'たちつてと',hint:''},
+    {jp:'なにぬねの',hint:''},
+    {jp:'はひふへほ',hint:''},
+    {jp:'まみむめも',hint:''},
+    {jp:'やゆよ',hint:''},
+    {jp:'らりるれろ',hint:''},
+    {jp:'わをん',hint:''},
+    {jp:'がぎぐげご',hint:''},
+    {jp:'ざじずぜぞ',hint:''},
+    {jp:'だでど',hint:''},
+    {jp:'ばびぶべぼ',hint:''},
+    {jp:'ぱぴぷぺぽ',hint:''},
+    {jp:'きゃきゅきょ',hint:''},
+    {jp:'しゃしゅしょ',hint:''},
+    {jp:'ちゃちゅちょ',hint:''},
+    {jp:'じゃじゅじょ',hint:''},
+    {jp:'にゃにゅにょ',hint:''},
+  ],
+  words:[
+    {jp:'さくら',hint:'桜'},
+    {jp:'にほん',hint:'日本'},
+    {jp:'たべもの',hint:'食べ物'},
+    {jp:'でんしゃ',hint:'電車'},
+    {jp:'とうきょう',hint:'東京'},
+    {jp:'きょうかしょ',hint:'教科書'},
+    {jp:'おはようございます',hint:'朝の挨拶'},
+    {jp:'ありがとう',hint:'感謝'},
+    {jp:'こんにちは',hint:'昼の挨拶'},
+    {jp:'かいしゃ',hint:'会社'},
+    {jp:'でんき',hint:'電気'},
+    {jp:'がっこう',hint:'学校'},
+    {jp:'うみ',hint:'海'},
+    {jp:'やま',hint:'山'},
+    {jp:'はる',hint:'春'},
+    {jp:'なつ',hint:'夏'},
+    {jp:'あき',hint:'秋'},
+    {jp:'ふゆ',hint:'冬'},
+    {jp:'パソコン',hint:'PC'},
+    {jp:'インターネット',hint:'ネット'},
+  ],
+  sentences:[
+    {jp:'わたしはがくせいです',hint:'私は学生です'},
+    {jp:'きょうはいいてんきです',hint:'今日は良い天気です'},
+    {jp:'にほんごをべんきょうしています',hint:'日本語を勉強しています'},
+    {jp:'でんしゃにのってかいしゃにいきます',hint:'電車に乗って会社に行きます'},
+    {jp:'このほんはおもしろいです',hint:'この本は面白いです'},
+    {jp:'まいにちれんしゅうすることがたいせつです',hint:'毎日練習することが大切です'},
+    {jp:'しゅくだいをわすれました',hint:'宿題を忘れました'},
+    {jp:'ともだちとしょくじをたべました',hint:'友達と食事を食べました'},
+  ]
+};
+
+let level='gojuon',questionCount=10,questions=[],qIndex=0;
+let startTime=null,timerInterval=null,totalMisses=0,totalKeystrokes=0;
+let currentTarget='',inputProgress='',hintShown=false;
+let missStats={};
+let stats=JSON.parse(localStorage.getItem(STORAGE_KEY)||'{"sessions":0,"totalWPM":0,"bestWPM":0}');
+
+function toRomaji(jp){
+  let r='';
+  let i=0;
+  while(i<jp.length){
+    // 2文字の組み合わせを先に確認
+    if(i+1<jp.length&&ROMAJI_TABLE[jp[i]+jp[i+1]]){
+      r+=ROMAJI_TABLE[jp[i]+jp[i+1]];i+=2;
+    }else if(ROMAJI_TABLE[jp[i]]){
+      r+=ROMAJI_TABLE[jp[i]];i++;
+    }else{
+      r+=jp[i];i++;
+    }
+  }
+  return r;
+}
+
+function shuffleArray(arr){
+  const a=[...arr];
+  for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}
+  return a;
+}
+
+function generateQuestions(){
+  const pool=QUESTIONS[level];
+  const n=Math.min(questionCount,pool.length);
+  return shuffleArray(pool).slice(0,n);
+}
+
+function startSession(){
+  questions=generateQuestions();
+  qIndex=0;totalMisses=0;totalKeystrokes=0;missStats={};
+  document.getElementById('q-total').textContent=questions.length;
+  document.getElementById('practice-area').classList.remove('hidden');
+  document.getElementById('result-area').classList.add('hidden');
+  loadQuestion();
+}
+
+function loadQuestion(){
+  const q=questions[qIndex];
+  currentTarget=toRomaji(q.jp);
+  inputProgress='';
+  hintShown=false;
+
+  document.getElementById('q-current').textContent=qIndex+1;
+  document.getElementById('japanese-display').textContent=q.jp;
+  document.getElementById('romaji-hint').textContent=q.hint?`（${q.hint}）`:'';
+  document.getElementById('progress-display').innerHTML='';
+  document.getElementById('type-input').value='';
+  document.getElementById('type-input').disabled=false;
+  document.getElementById('feedback').textContent='';
+  updateProgress();
+  document.getElementById('type-input').focus();
+
+  if(qIndex===0){
+    startTime=Date.now();
+    timerInterval=setInterval(updateTimer,100);
+  }
+}
+
+function updateTimer(){
+  const elapsed=((Date.now()-startTime)/1000).toFixed(1);
+  document.getElementById('elapsed-time').textContent=elapsed;
+}
+
+function updateProgress(){
+  const target=currentTarget;
+  const typed=inputProgress;
+  let html='';
+  for(let i=0;i<target.length;i++){
+    if(i<typed.length){
+      if(typed[i]===target[i])html+=`<span class="char-correct">${target[i]}</span>`;
+      else html+=`<span class="char-wrong">${target[i]}</span>`;
+    }else if(i===typed.length){
+      html+=`<span class="char-current">${target[i]}</span>`;
+    }else{
+      html+=`<span class="char-pending">${target[i]}</span>`;
+    }
+  }
+  document.getElementById('progress-display').innerHTML=html;
+}
+
+function updateStats(){
+  const elapsed=(Date.now()-startTime)/1000/60;
+  const wpm=Math.round(totalKeystrokes/5/elapsed)||0;
+  const accuracy=totalKeystrokes>0?Math.round((totalKeystrokes-totalMisses)/totalKeystrokes*100):100;
+  document.getElementById('wpm').textContent=wpm;
+  document.getElementById('accuracy').textContent=accuracy+'%';
+}
+
+document.getElementById('type-input').addEventListener('input',e=>{
+  const val=e.target.value.toLowerCase();
+  const target=currentTarget;
+
+  // 入力チェック
+  let correct=true;
+  for(let i=0;i<val.length;i++){
+    if(i>=target.length||val[i]!==target[i]){correct=false;break;}
+  }
+
+  if(correct){
+    if(val.length>inputProgress.length){
+      totalKeystrokes++;
+      inputProgress=val;
+    }
+  }else{
+    // ミス
+    const wrongChar=val[val.length-1];
+    totalMisses++;totalKeystrokes++;
+    missStats[wrongChar]=(missStats[wrongChar]||0)+1;
+    e.target.style.borderColor='#ef4444';
+    setTimeout(()=>e.target.style.borderColor='',200);
+    document.getElementById('feedback').innerHTML='<span class="text-red-500">❌ ミス!</span>';
+    setTimeout(()=>document.getElementById('feedback').textContent='',800);
+    // ミス時は正しい入力部分まで戻す
+    e.target.value=inputProgress;
+  }
+
+  updateProgress();
+  updateStats();
+
+  // 完了チェック
+  if(inputProgress===target){
+    document.getElementById('feedback').innerHTML='<span class="text-green-500 font-bold">✅ 正解!</span>';
+    document.getElementById('type-input').disabled=true;
+    setTimeout(nextQuestion,600);
+  }
+});
+
+function nextQuestion(){
+  qIndex++;
+  if(qIndex>=questions.length){finishSession();}
+  else{loadQuestion();}
+}
+
+function finishSession(){
+  clearInterval(timerInterval);
+  const elapsed=(Date.now()-startTime)/1000;
+  const wpm=Math.round(totalKeystrokes/5/(elapsed/60))||0;
+  const accuracy=totalKeystrokes>0?Math.round((totalKeystrokes-totalMisses)/totalKeystrokes*100):100;
+
+  document.getElementById('practice-area').classList.add('hidden');
+  document.getElementById('result-area').classList.remove('hidden');
+  document.getElementById('res-wpm').textContent=wpm;
+  document.getElementById('res-accuracy').textContent=accuracy+'%';
+  document.getElementById('res-time').textContent=elapsed.toFixed(1)+'s';
+  document.getElementById('res-misses').textContent=totalMisses;
+
+  // ミス分析
+  const missEl=document.getElementById('miss-analysis');
+  const topMisses=Object.entries(missStats).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  if(topMisses.length>0){
+    missEl.innerHTML=`<h3 class="font-semibold text-gray-700 mb-2">よくミスしたキー</h3>
+      <div class="flex flex-wrap gap-2">${topMisses.map(([k,v])=>`<span class="bg-red-100 text-red-700 px-3 py-1 rounded-full text-sm font-mono">"${k}" ×${v}</span>`).join('')}</div>`;
+  }
+
+  // 統計更新
+  stats.sessions++;
+  stats.totalWPM+=wpm;
+  if(wpm>stats.bestWPM)stats.bestWPM=wpm;
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(stats));
+  renderStats();
+}
+
+function renderStats(){
+  const el=document.getElementById('stats-display');
+  if(stats.sessions===0){el.textContent='まだ記録がありません';return;}
+  el.innerHTML=`
+    <div class="grid grid-cols-3 gap-3 text-center">
+      <div class="bg-gray-50 rounded-lg p-2"><div class="text-xl font-bold text-gray-700">${stats.sessions}</div><div class="text-xs text-gray-400">セッション数</div></div>
+      <div class="bg-gray-50 rounded-lg p-2"><div class="text-xl font-bold text-indigo-600">${Math.round(stats.totalWPM/stats.sessions)||0}</div><div class="text-xs text-gray-400">平均WPM</div></div>
+      <div class="bg-gray-50 rounded-lg p-2"><div class="text-xl font-bold text-green-600">${stats.bestWPM}</div><div class="text-xs text-gray-400">最高WPM</div></div>
+    </div>`;
+}
+
+document.querySelectorAll('.level-btn').forEach(btn=>{
+  btn.addEventListener('click',()=>{
+    document.querySelectorAll('.level-btn').forEach(b=>{b.classList.remove('active','bg-indigo-600','text-white');b.classList.add('bg-gray-100','text-gray-600');});
+    btn.classList.add('active','bg-indigo-600','text-white');btn.classList.remove('bg-gray-100','text-gray-600');
+    level=btn.dataset.level;
+  });
+});
+
+document.getElementById('start-btn').addEventListener('click',()=>{
+  questionCount=+document.getElementById('question-count').value;
+  startSession();
+});
+
+document.getElementById('skip-btn').addEventListener('click',()=>{
+  totalMisses+=3;nextQuestion();
+});
+
+document.getElementById('show-hint').addEventListener('click',()=>{
+  if(!hintShown){
+    document.getElementById('romaji-hint').textContent=`ローマ字: ${currentTarget}`;
+    hintShown=true;totalMisses+=2;
+  }
+});
+
+document.getElementById('retry-btn').addEventListener('click',()=>{
+  document.getElementById('result-area').classList.add('hidden');
+  startSession();
+});
+
+document.getElementById('clear-stats').addEventListener('click',()=>{
+  if(!confirm('統計をリセットしますか？'))return;
+  stats={sessions:0,totalWPM:0,bestWPM:0};
+  localStorage.setItem(STORAGE_KEY,JSON.stringify(stats));
+  renderStats();
+});
+
+renderStats();
+</script>
+</body>
+</html>
